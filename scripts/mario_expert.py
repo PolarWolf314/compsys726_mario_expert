@@ -202,6 +202,9 @@ class MarioExpert:
         This is just a very basic example
         """
 
+        # Always sprint and run to the right
+        self.environment.run_action(self.mario_sprint_and_run())
+
         # Choose an action - button press or other...
         action = self.choose_action()
 

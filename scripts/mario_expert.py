@@ -50,8 +50,8 @@ class Action(IntEnum):
 
 
 class MemoryMap(Enum):
-    MARIO_Y_POSITION = C201
-    MARIO_X_POSITION = C202
+    MARIO_Y_POSITION = "C201"
+    MARIO_X_POSITION = "C202"
 
 
 class MarioController(MarioEnvironment):
@@ -81,7 +81,7 @@ class MarioController(MarioEnvironment):
         self.act_freq = act_freq
 
         # Example of valid actions based purely on the buttons you can press
-        valid_actions: list[WindowEvent] = [
+        valid_actions: list[int] = [
             WindowEvent.PRESS_ARROW_DOWN,
             WindowEvent.PRESS_ARROW_LEFT,
             WindowEvent.PRESS_ARROW_RIGHT,
@@ -90,7 +90,7 @@ class MarioController(MarioEnvironment):
             WindowEvent.PRESS_BUTTON_B,
         ]
 
-        release_button: list[WindowEvent] = [
+        release_button: list[int] = [
             WindowEvent.RELEASE_ARROW_DOWN,
             WindowEvent.RELEASE_ARROW_LEFT,
             WindowEvent.RELEASE_ARROW_RIGHT,
@@ -102,7 +102,7 @@ class MarioController(MarioEnvironment):
         self.valid_actions = valid_actions
         self.release_button = release_button
 
-    def run_action(self, action: int) -> None:
+    def run_action(self, action: tuple) -> None:
         """
         This is a very basic example of how this function could be implemented
 
@@ -111,13 +111,14 @@ class MarioController(MarioEnvironment):
         You can change the action type to whatever you want or need just remember the base control of the game is pushing buttons
         """
 
-        # Simply toggles the buttons being on or off for a duration of act_freq
-        self.pyboy.send_input(self.valid_actions[action])
+        for a in action:
+            self.pyboy.send_input(self.valid_actions[a])
 
         for _ in range(self.act_freq):
             self.pyboy.tick()
 
-        self.pyboy.send_input(self.release_button[action])
+        for a in action:
+            self.pyboy.send_input(self.release_button[a])
 
 
 class MarioExpert:
@@ -172,14 +173,27 @@ class MarioExpert:
 
         return (end_frame_x_position, 0)
 
-    def choose_action(self):
+    def mario_sprint_and_run(self) -> tuple[int, int]:
+        """
+        Function to make mario sprint and run
+        Returns:
+            tuple: The action to make mario sprint and run
+        """
+
+        return (
+            self.environment.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT),
+            self.environment.valid_actions.index(WindowEvent.PRESS_BUTTON_A),
+        )
+
+    def choose_action(self) -> tuple:
         state = self.environment.game_state()
         frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
 
         # Implement your code here to choose the best action
         # time.sleep(0.1)
-        return self.environment.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT)
+
+        return self.mario_sprint_and_run()
 
     def step(self):
         """

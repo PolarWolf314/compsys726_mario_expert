@@ -154,6 +154,24 @@ class MarioExpert:
 
         return (mario_x_position, mario_y_position)
 
+    def get_end_of_frame_position(self) -> tuple[int, int]:
+        """
+        Get the position of the end of the frame in the game area where mario can stand on
+        Returns:
+            tuple: The position of the end of the frame in the game area
+        """
+        end_frame_x_position = 9
+
+        # from the bottom of the frame see where the first ground block is
+        for y in range(18, 0, -1):
+            if (
+                self.environment.game_area()[y][end_frame_x_position]
+                == SpriteMap.GROUND
+            ):
+                return (end_frame_x_position, y)
+
+        return (end_frame_x_position, 0)
+
     def choose_action(self):
         state = self.environment.game_state()
         frame = self.environment.grab_frame()

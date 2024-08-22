@@ -54,6 +54,11 @@ class MemoryMap(IntEnum):
     MARIO_X_POSITION = int("C202", 16)
 
 
+class GameAreaAttributes(IntEnum):
+    WIDTH = 20
+    HEIGHT = 16
+
+
 class MarioController(MarioEnvironment):
     """
     The MarioController class represents a controller for the Mario game environment.
@@ -68,7 +73,7 @@ class MarioController(MarioEnvironment):
 
     def __init__(
         self,
-        act_freq: int = 10,
+        act_freq: int = 1,
         emulation_speed: int = 1,
         headless: bool = False,
     ) -> None:
@@ -111,6 +116,14 @@ class MarioController(MarioEnvironment):
         You can change the action type to whatever you want or need just remember the base control of the game is pushing buttons
         """
 
+        self.pyboy.send_input(
+            self.valid_actions[self.valid_actions.index(WindowEvent.PRESS_BUTTON_B)]
+        )
+
+        self.pyboy.send_input(
+            self.valid_actions[self.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT)]
+        )
+
         for a in action:
             self.pyboy.send_input(self.valid_actions[a])
 
@@ -151,8 +164,8 @@ class MarioExpert:
             tuple: The position of Mario in the game area
         """
         # scan the game area
-        for y in range(16):
-            for x in range(20):
+        for y in range(GameAreaAttributes.HEIGHT):
+            for x in range(GameAreaAttributes.WIDTH):
                 if game_area[y][x] == SpriteMap.MARIO:
                     return (x, y)
 
@@ -176,18 +189,6 @@ class MarioExpert:
 
         return (end_frame_x_position, 0)
 
-    def mario_sprint_and_run(self) -> list[int]:
-        """
-        Function to make mario sprint and run
-        Returns:
-            tuple: The action to make mario sprint and run
-        """
-
-        return [
-            self.environment.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT),
-            self.environment.valid_actions.index(WindowEvent.PRESS_BUTTON_B),
-        ]
-
     def is_enemy_ahead(self, game_area: np.ndarray) -> bool:
 
         print(game_area.shape)
@@ -195,7 +196,7 @@ class MarioExpert:
         print(mario_x_position, mario_y_position)
 
         for x in range(7):
-            for y in range(16):
+            for y in range(GameAreaAttributes.HEIGHT):
                 if game_area[y][mario_x_position + x] in [
                     SpriteMap.GOOMBA.value,
                     SpriteMap.KOOPA.value,
@@ -215,7 +216,7 @@ class MarioExpert:
         # Implement your code here to choose the best action
         # time.sleep(0.1)
 
-        return self.mario_sprint_and_run()
+        return []
 
     def step(self):
         """
@@ -223,9 +224,6 @@ class MarioExpert:
 
         This is just a very basic example
         """
-
-        # Always sprint and run to the right
-        self.environment.run_action(self.mario_sprint_and_run())
 
         # Choose an action - button press or other...
         action = self.choose_action()

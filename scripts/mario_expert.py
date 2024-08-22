@@ -9,9 +9,9 @@ Original Mario Manual: https://www.thegameisafootarcade.com/wp-content/uploads/2
 import json
 import logging
 from enum import IntEnum
-from enum import Enum
 
 import cv2
+import numpy as np
 from pyboy.utils import WindowEvent
 
 from mario_environment import MarioEnvironment
@@ -49,9 +49,9 @@ class Action(IntEnum):
     B = 5  # fireball
 
 
-class MemoryMap(Enum):
-    MARIO_Y_POSITION = "C201"
-    MARIO_X_POSITION = "C202"
+class MemoryMap(IntEnum):
+    MARIO_Y_POSITION = int("C201", 16)
+    MARIO_X_POSITION = int("C202", 16)
 
 
 class MarioController(MarioEnvironment):
@@ -69,7 +69,7 @@ class MarioController(MarioEnvironment):
     def __init__(
         self,
         act_freq: int = 10,
-        emulation_speed: int = 0,
+        emulation_speed: int = 1,
         headless: bool = False,
     ) -> None:
         super().__init__(
@@ -102,7 +102,7 @@ class MarioController(MarioEnvironment):
         self.valid_actions = valid_actions
         self.release_button = release_button
 
-    def run_action(self, action: tuple) -> None:
+    def run_action(self, action: list) -> None:
         """
         This is a very basic example of how this function could be implemented
 
@@ -144,16 +144,19 @@ class MarioExpert:
         # storing the path for mario to move
         self.path = []
 
-    def get_mario_position(self) -> tuple[int, int]:
+    def get_mario_position(self, game_area: np.ndarray) -> tuple[int, int]:
         """
         Get the position of Mario in the game area
         Returns:
             tuple: The position of Mario in the game area
         """
-        mario_x_position = self.environment._read_m(MemoryMap.MARIO_X_POSITION.value)
-        mario_y_position = self.environment._read_m(MemoryMap.MARIO_Y_POSITION.value)
+        # scan the game area
+        for y in range(16):
+            for x in range(20):
+                if game_area[y][x] == SpriteMap.MARIO:
+                    return (x, y)
 
-        return (mario_x_position, mario_y_position)
+        return (x, y)
 
     def get_end_of_frame_position(self) -> tuple[int, int]:
         """
@@ -173,23 +176,42 @@ class MarioExpert:
 
         return (end_frame_x_position, 0)
 
-    def mario_sprint_and_run(self) -> tuple[int, int]:
+    def mario_sprint_and_run(self) -> list[int]:
         """
         Function to make mario sprint and run
         Returns:
             tuple: The action to make mario sprint and run
         """
 
-        return (
+        return [
             self.environment.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT),
-            self.environment.valid_actions.index(WindowEvent.PRESS_BUTTON_A),
-        )
+            self.environment.valid_actions.index(WindowEvent.PRESS_BUTTON_B),
+        ]
 
-    def choose_action(self) -> tuple:
+    def is_enemy_ahead(self, game_area: np.ndarray) -> bool:
+
+        print(game_area.shape)
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+        print(mario_x_position, mario_y_position)
+
+        for x in range(7):
+            for y in range(16):
+                if game_area[y][mario_x_position + x] in [
+                    SpriteMap.GOOMBA.value,
+                    SpriteMap.KOOPA.value,
+                    SpriteMap.FIGHTER_FLY.value,
+                ]:
+                    return True
+        return False
+
+    def choose_action(self) -> list:
         state = self.environment.game_state()
         frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
+        print(game_area)
 
+        if self.is_enemy_ahead(game_area):
+            return [self.environment.valid_actions.index(WindowEvent.PRESS_BUTTON_A)]
         # Implement your code here to choose the best action
         # time.sleep(0.1)
 

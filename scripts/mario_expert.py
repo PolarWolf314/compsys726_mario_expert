@@ -8,11 +8,50 @@ Original Mario Manual: https://www.thegameisafootarcade.com/wp-content/uploads/2
 
 import json
 import logging
-import random
+from enum import IntEnum
+from enum import Enum
 
 import cv2
-from mario_environment import MarioEnvironment
 from pyboy.utils import WindowEvent
+
+from mario_environment import MarioEnvironment
+
+
+class SpriteMap(IntEnum):
+    AIR = 0
+    MARIO = 1
+    # ITEMS
+    COIN = 5
+    MUSHROOM = 6
+    STAR = 8
+    # BLOCKS
+    GROUND = 10
+    COIN_BRICK = 10
+    USED_POWERUP_BLOCK = 10
+    MOVING_PLATFORM = 11
+    BRICK = 12
+    POWERUP_BLOCK = 13
+    PIPE = 14
+    # ENEMIES
+    GOOMBA = 15
+    KOOPA = 16
+    FIGHTER_FLY = 18
+    KOOPA_BOMB_SHELL = 25
+
+
+class Action(IntEnum):
+    DOWN = 0
+    LEFT = 1
+    RIGHT = 2
+    UP = 3
+    A = 4  # jump
+    JUMP = 4
+    B = 5  # fireball
+
+
+class MemoryMap(Enum):
+    MARIO_Y_POSITION = C201
+    MARIO_X_POSITION = C202
 
 
 class MarioController(MarioEnvironment):
@@ -101,6 +140,20 @@ class MarioExpert:
 
         self.video = None
 
+        # storing the path for mario to move
+        self.path = []
+
+    def get_mario_position(self) -> tuple[int, int]:
+        """
+        Get the position of Mario in the game area
+        Returns:
+            tuple: The position of Mario in the game area
+        """
+        mario_x_position = self.environment._read_m(MemoryMap.MARIO_X_POSITION.value)
+        mario_y_position = self.environment._read_m(MemoryMap.MARIO_Y_POSITION.value)
+
+        return (mario_x_position, mario_y_position)
+
     def choose_action(self):
         state = self.environment.game_state()
         frame = self.environment.grab_frame()
@@ -108,7 +161,7 @@ class MarioExpert:
 
         # Implement your code here to choose the best action
         # time.sleep(0.1)
-        return random.randint(0, len(self.environment.valid_actions) - 1)
+        return self.environment.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT)
 
     def step(self):
         """

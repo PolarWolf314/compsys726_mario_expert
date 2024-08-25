@@ -48,6 +48,7 @@ class Action(IntEnum):
     A = 4  # jump
     JUMP = 4
     B = 5  # fireball
+    SPRINT = 5
 
 
 class MemoryMap(IntEnum):
@@ -56,6 +57,7 @@ class MemoryMap(IntEnum):
 
 
 class GameAreaAttributes(IntEnum):
+    # Width and height of game area
     WIDTH = 20
     HEIGHT = 16
 
@@ -71,15 +73,13 @@ class MarioActions(Enum):
     SPRINT_AND_RUN = (
         1,
         [
-            WindowEvent.PRESS_ARROW_RIGHT,
-            WindowEvent.PRESS_BUTTON_B,
-            WindowEvent.RELEASE_ARROW_RIGHT,
-            WindowEvent.RELEASE_BUTTON_B,
+            Action.RIGHT,
+            Action.SPRINT,
         ],
     )
-    SHORT_JUMP = (1, [WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A])
-    MEDIUM_JUMP = (2, [WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A])
-    LONG_JUMP = (3, [WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A])
+    SHORT_JUMP = (10, [Action.JUMP])
+    MEDIUM_JUMP = (20, [Action.JUMP])
+    LONG_JUMP = (30, [Action.JUMP])
 
 
 class MarioController(MarioEnvironment):
@@ -96,7 +96,7 @@ class MarioController(MarioEnvironment):
 
     def __init__(
         self,
-        act_freq: int = 10,
+        act_freq: int = 1,
         emulation_speed: int = 1,
         headless: bool = False,
     ) -> None:
@@ -139,30 +139,21 @@ class MarioController(MarioEnvironment):
         You can change the action type to whatever you want or need just remember the base control of the game is pushing buttons
         """
 
-        self.pyboy.send_input(
-            self.valid_actions[self.valid_actions.index(WindowEvent.PRESS_BUTTON_B)]
-        )
+        self.pyboy.send_input(self.valid_actions[Action.RIGHT])
 
-        self.pyboy.send_input(
-            self.valid_actions[self.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT)]
-        )
+        self.pyboy.send_input(self.valid_actions[Action.SPRINT])
 
         self.pyboy.tick()
 
         for duration in range(action[0]):
             for a in action[1]:
-                if a in self.valid_actions:
-                    self.pyboy.send_input(self.valid_actions.index(a))
+                self.pyboy.send_input(self.valid_actions[a])
 
             for _ in range(self.act_freq):
                 self.pyboy.tick()
 
             for a in action[1]:
-                if a in self.release_button:
-                    self.pyboy.send_input(self.release_button.index(a))
-
-            for _ in range(self.act_freq):
-                self.pyboy.tick()
+                self.pyboy.send_input(self.release_button[a])
 
 
 class MarioExpert:
@@ -198,7 +189,7 @@ class MarioExpert:
         for y in range(GameAreaAttributes.HEIGHT):
             for x in range(GameAreaAttributes.WIDTH):
                 if game_area[y][x] == SpriteMap.MARIO:
-                    return (x, y)
+                    return (x + 1, y + 1)
 
         return (x, y)
 
@@ -224,7 +215,7 @@ class MarioExpert:
 
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
 
-        for x in range(7):
+        for x in range(1, 10):
             for y in range(GameAreaAttributes.HEIGHT):
                 if game_area[y][mario_x_position + x] in [
                     SpriteMap.GOOMBA.value,
@@ -240,6 +231,7 @@ class MarioExpert:
         game_area = self.environment.game_area()
 
         if self.is_enemy_ahead(game_area):
+            print("Enemy ahead, performing short jump")
             return MarioActions.SHORT_JUMP.value
         # Implement your code here to choose the best action
         # time.sleep(0.1)

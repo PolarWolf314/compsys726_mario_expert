@@ -101,7 +101,7 @@ class MarioEnvironment(PyboyEnvironment):
 
     def get_x_position(self):
         # Copied from: https://github.com/lixado/PyBoy-RL/blob/main/AISettings/MarioAISettings.py
-        # Do not understand how this works...
+        # DO NOT UNDERSTAND HOW THIS WORKS...
         level_block = self._read_m(0xC0AB)
         mario_x = self._read_m(0xC202)
         scx = self.pyboy.screen.tilemap_position_list[16][0]

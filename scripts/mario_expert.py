@@ -9,6 +9,7 @@ Original Mario Manual: https://www.thegameisafootarcade.com/wp-content/uploads/2
 import json
 import logging
 from enum import IntEnum
+from enum import Enum
 
 import cv2
 import numpy as np
@@ -59,6 +60,28 @@ class GameAreaAttributes(IntEnum):
     HEIGHT = 16
 
 
+class MarioActions(Enum):
+    """
+    An enum class to represent custom actions for the Mario game.
+
+    Each value is a tuple where the first element determines how long the action
+    should be performed and the second element is a list of buttons to press.
+    """
+
+    SPRINT_AND_RUN = (
+        1,
+        [
+            WindowEvent.PRESS_ARROW_RIGHT,
+            WindowEvent.PRESS_BUTTON_B,
+            WindowEvent.RELEASE_ARROW_RIGHT,
+            WindowEvent.RELEASE_BUTTON_B,
+        ],
+    )
+    SHORT_JUMP = (1, [WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A])
+    MEDIUM_JUMP = (2, [WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A])
+    LONG_JUMP = (3, [WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A])
+
+
 class MarioController(MarioEnvironment):
     """
     The MarioController class represents a controller for the Mario game environment.
@@ -73,7 +96,7 @@ class MarioController(MarioEnvironment):
 
     def __init__(
         self,
-        act_freq: int = 1,
+        act_freq: int = 10,
         emulation_speed: int = 1,
         headless: bool = False,
     ) -> None:
@@ -107,7 +130,7 @@ class MarioController(MarioEnvironment):
         self.valid_actions = valid_actions
         self.release_button = release_button
 
-    def run_action(self, action: list) -> None:
+    def run_action(self, action: tuple[int, list]) -> None:
         """
         This is a very basic example of how this function could be implemented
 
@@ -124,14 +147,22 @@ class MarioController(MarioEnvironment):
             self.valid_actions[self.valid_actions.index(WindowEvent.PRESS_ARROW_RIGHT)]
         )
 
-        for a in action:
-            self.pyboy.send_input(self.valid_actions[a])
+        self.pyboy.tick()
 
-        for _ in range(self.act_freq):
-            self.pyboy.tick()
+        for duration in range(action[0]):
+            for a in action[1]:
+                if a in self.valid_actions:
+                    self.pyboy.send_input(self.valid_actions.index(a))
 
-        for a in action:
-            self.pyboy.send_input(self.release_button[a])
+            for _ in range(self.act_freq):
+                self.pyboy.tick()
+
+            for a in action[1]:
+                if a in self.release_button:
+                    self.pyboy.send_input(self.release_button.index(a))
+
+            for _ in range(self.act_freq):
+                self.pyboy.tick()
 
 
 class MarioExpert:
@@ -191,9 +222,7 @@ class MarioExpert:
 
     def is_enemy_ahead(self, game_area: np.ndarray) -> bool:
 
-        print(game_area.shape)
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
-        print(mario_x_position, mario_y_position)
 
         for x in range(7):
             for y in range(GameAreaAttributes.HEIGHT):
@@ -205,18 +234,17 @@ class MarioExpert:
                     return True
         return False
 
-    def choose_action(self) -> list:
+    def choose_action(self) -> tuple[int, list]:
         state = self.environment.game_state()
         frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
-        print(game_area)
 
         if self.is_enemy_ahead(game_area):
-            return [self.environment.valid_actions.index(WindowEvent.PRESS_BUTTON_A)]
+            return MarioActions.SHORT_JUMP.value
         # Implement your code here to choose the best action
         # time.sleep(0.1)
 
-        return []
+        return MarioActions.SPRINT_AND_RUN.value
 
     def step(self):
         """

@@ -19,7 +19,7 @@ def get_args():
 
     parse_args.add_argument("--headless", action="store_true")
 
-    parse_args.add_argument("--upi", type=str, required=True)
+    parse_args.add_argument("--upi", type=str, required=False, default="aguo467")
 
     return parse_args.parse_args()
 

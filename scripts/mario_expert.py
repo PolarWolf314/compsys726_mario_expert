@@ -242,10 +242,24 @@ class MarioExpert:
 
         return False
 
+    def is_pit_ahead(self, game_area: np.ndarray) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+        print(game_area)
+        for x in range(1, 10):
+            if game_area[GameAreaAttributes.HEIGHT - 1][mario_x_position + x] in [
+                SpriteMap.AIR.value
+            ]:
+                return True
+        return False
+
     def choose_action(self) -> tuple[int, list]:
         state = self.environment.game_state()
         frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
+
+        if self.is_pit_ahead(game_area):
+            print("Pit ahead")
+            return MarioActions.SHORT_JUMP.value
 
         if self.is_enemy_ahead(game_area):
             print("Enemy ahead")
@@ -254,6 +268,7 @@ class MarioExpert:
         if self.is_obstacle_ahead(game_area):
             print("Obstacle ahead")
             return MarioActions.LONG_JUMP.value
+
         # Implement your code here to choose the best action
         # time.sleep(0.1)
 

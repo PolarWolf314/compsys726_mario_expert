@@ -225,14 +225,35 @@ class MarioExpert:
                     return True
         return False
 
+    def is_obstacle_ahead(self, game_area: np.ndarray) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+
+        for x in range(1, 10):
+            for y in range(GameAreaAttributes.HEIGHT):
+                if game_area[y][mario_x_position + x] in [
+                    SpriteMap.BRICK.value,
+                    SpriteMap.PIPE.value,
+                    SpriteMap.COIN_BRICK.value,
+                    SpriteMap.USED_POWERUP_BLOCK.value,
+                    SpriteMap.POWERUP_BLOCK.value,
+                    SpriteMap.MOVING_PLATFORM.value,
+                ]:
+                    return True
+
+        return False
+
     def choose_action(self) -> tuple[int, list]:
         state = self.environment.game_state()
         frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
 
         if self.is_enemy_ahead(game_area):
-            print("Enemy ahead, performing short jump")
-            return MarioActions.SHORT_JUMP.value
+            print("Enemy ahead")
+            return MarioActions.LONG_JUMP.value
+
+        if self.is_obstacle_ahead(game_area):
+            print("Obstacle ahead")
+            return MarioActions.LONG_JUMP.value
         # Implement your code here to choose the best action
         # time.sleep(0.1)
 

@@ -8,6 +8,7 @@ Original Mario Manual: https://www.thegameisafootarcade.com/wp-content/uploads/2
 
 import json
 import logging
+import math
 from enum import IntEnum
 from enum import Enum
 
@@ -195,27 +196,52 @@ class MarioExpert:
 
         return (x, y)
 
-    def is_enemy_ahead(self, game_area: np.ndarray, distance: int) -> bool:
+    def is_enemy_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int
+    ) -> bool:
 
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
 
-        for x in range(1, distance):
-            for y in range(1, 4):
-                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT:
+        for x in range(distance_check):
+            for y in range(height_check):
+                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT or (
+                    mario_y_position - y
+                ) < 0:
                     continue
-                if game_area[mario_y_position - y + 2][mario_x_position + x] in [
+                if game_area[mario_y_position - y][mario_x_position + x] in [
                     SpriteMap.GOOMBA.value,
                     SpriteMap.KOOPA.value,
                 ]:
                     return True
         return False
 
-    def is_obstacle_ahead(self, game_area: np.ndarray, distance: int) -> bool:
+    def is_fighter_fly_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int
+    ) -> bool:
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
 
-        for x in range(1, distance):
-            for y in range(1, 2):
-                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT:
+        for x in range(distance_check):
+            for y in range(height_check):
+                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT or (
+                    mario_y_position - y
+                ) < 0:
+                    continue
+                if game_area[mario_y_position - y][mario_x_position + x] in [
+                    SpriteMap.FIGHTER_FLY.value,
+                ]:
+                    return True
+        return False
+
+    def is_obstacle_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+
+        for x in range(distance_check):
+            for y in range(height_check):
+                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT or (
+                    mario_y_position - y
+                ) < 0:
                     continue
                 if game_area[mario_y_position - y][mario_x_position + x] in [
                     SpriteMap.USED_POWERUP_BLOCK.value,
@@ -226,9 +252,9 @@ class MarioExpert:
 
         return False
 
-    def is_pit_ahead(self, game_area: np.ndarray, distance: int) -> bool:
+    def is_pit_ahead(self, game_area: np.ndarray, distance_check: int) -> bool:
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
-        for x in range(1, distance):
+        for x in range(distance_check):
             if game_area[GameAreaAttributes.HEIGHT - 1][mario_x_position + x] in [
                 SpriteMap.AIR.value
             ]:
@@ -240,15 +266,25 @@ class MarioExpert:
         frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
 
-        if self.is_enemy_ahead(game_area, 3):
+        if self.is_fighter_fly_ahead(game_area, 3, 3):
+            print("Fighter Fly ahead")
+            return MarioActions.SPRINT_AND_RUN.value
+
+        if self.is_enemy_ahead(game_area, 6, 6) and self.is_obstacle_ahead(
+            game_area, 5, 6
+        ):
+            print("Enemy and obstacle ahead")
+            return MarioActions.LONG_JUMP.value
+
+        if self.is_enemy_ahead(game_area, 3, 2):
             print("Enemy ahead")
             return MarioActions.TAP_JUMP.value
 
-        if self.is_pit_ahead(game_area, 1):
+        if self.is_pit_ahead(game_area, 3):
             print("Pit ahead")
             return MarioActions.TAP_JUMP.value
 
-        if self.is_obstacle_ahead(game_area, 5):
+        if self.is_obstacle_ahead(game_area, 4, 2):
             print("Obstacle ahead")
             return MarioActions.MEDIUM_JUMP.value
 

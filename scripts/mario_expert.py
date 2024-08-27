@@ -81,6 +81,7 @@ class MarioActions(Enum):
     )
     TAP_JUMP = (1, [Action.JUMP])
     SHORT_JUMP = (5, [Action.JUMP])
+    SHORT_MEDIUM_JUMP = (8, [Action.JUMP])
     MEDIUM_JUMP = (10, [Action.JUMP])
     LONG_JUMP = (15, [Action.JUMP])
 
@@ -182,6 +183,7 @@ class MarioExpert:
         # storing the path for mario to move
         self.path = []
         self.mario_obstacle_history = deque(maxlen=25)
+        self.mario_position_history = deque(maxlen=3)
 
     def get_mario_position(self, game_area: np.ndarray) -> tuple[int, int]:
         """
@@ -323,12 +325,27 @@ class MarioExpert:
                 return False
         return True
 
+    def is_mario_falling(self) -> bool:
+        if len(self.mario_position_history) < 2:
+            return False
+
+        mario_position = self.mario_position_history[0]
+        for i in range(len(self.mario_position_history)):
+            if mario_position[1] < self.mario_position_history[i][1]:
+                return True
+
+        return False
+
     def choose_action(self) -> tuple[int, list]:
         game_area = self.environment.game_area()
         #
         # get the last column of the game area
         last_column = game_area[:, -1]
         self.mario_obstacle_history.append(last_column)
+        self.mario_position_history.append(self.get_mario_position(game_area))
+
+        if self.is_mario_falling():
+            return MarioActions.SPRINT_AND_RUN.value
 
         if self.is_mario_stuck(self.mario_obstacle_history):
             print("Mario is stuck")
@@ -353,15 +370,19 @@ class MarioExpert:
             return MarioActions.LONG_JUMP.value
 
         if self.is_pit_ahead(game_area, 3):
-            print("Pit ahead")
-            print(game_area)
             if self.is_used_powerup_block_ahead(game_area, 8):
                 print("Pit and power block ahead")
                 return MarioActions.LONG_JUMP.value
 
+            if self.is_pit_ahead(game_area, 6, 4):
+                print("Big pit ahead")
+                return MarioActions.SHORT_MEDIUM_JUMP.value
+
             if self.is_pit_ahead(game_area, 4, 2):
-                print("Large pit ahead")
+                print("Medium pit ahead")
                 return MarioActions.MEDIUM_JUMP.value
+
+            print("Pit ahead")
             return MarioActions.TAP_JUMP.value
 
         if self.is_obstacle_ahead(game_area, 4, 2):

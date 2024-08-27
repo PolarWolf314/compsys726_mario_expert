@@ -8,9 +8,10 @@ Original Mario Manual: https://www.thegameisafootarcade.com/wp-content/uploads/2
 
 import json
 import logging
-import math
+import time
 from enum import IntEnum
 from enum import Enum
+from collections import deque
 
 import cv2
 import numpy as np
@@ -180,6 +181,7 @@ class MarioExpert:
 
         # storing the path for mario to move
         self.path = []
+        self.mario_obstacle_history = deque(maxlen=25)
 
     def get_mario_position(self, game_area: np.ndarray) -> tuple[int, int]:
         """
@@ -271,10 +273,26 @@ class MarioExpert:
                 return True
         return False
 
+    def is_mario_stuck(self, position_history: deque) -> bool:
+        if len(position_history) < 2:
+            return False
+
+        mario_position = position_history[0]
+        for i in range(len(position_history)):
+            if not np.array_equal(mario_position, position_history[i]):
+                return False
+        return True
+
     def choose_action(self) -> tuple[int, list]:
-        state = self.environment.game_state()
-        frame = self.environment.grab_frame()
         game_area = self.environment.game_area()
+        #
+        # get the last column of the game area
+        last_column = game_area[:, -1]
+        self.mario_obstacle_history.append(last_column)
+
+        if self.is_mario_stuck(self.mario_obstacle_history):
+            print("Mario is stuck")
+            return MarioActions.LONG_JUMP.value
 
         if self.is_pipe_ahead(game_area, 2):
             print("Pipe ahead")
@@ -301,9 +319,6 @@ class MarioExpert:
         if self.is_obstacle_ahead(game_area, 4, 2):
             print("Obstacle ahead")
             return MarioActions.MEDIUM_JUMP.value
-
-        # Implement your code here to choose the best action
-        # time.sleep(0.1)
 
         return MarioActions.SPRINT_AND_RUN.value
 

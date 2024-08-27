@@ -100,7 +100,7 @@ class MarioController(MarioEnvironment):
     def __init__(
         self,
         act_freq: int = 1,
-        emulation_speed: int = 1,
+        emulation_speed: int = 3,
         headless: bool = False,
     ) -> None:
         super().__init__(
@@ -205,10 +205,14 @@ class MarioExpert:
 
         for x in range(distance_check):
             for y in range(height_check):
-                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT or (
-                    mario_y_position - y
-                ) < 0:
+                if (
+                    (mario_y_position + y) >= GameAreaAttributes.HEIGHT
+                    or (mario_y_position - y) < 0
+                    or (mario_x_position + x) >= GameAreaAttributes.WIDTH
+                    or (mario_x_position - x) < 0
+                ):
                     continue
+
                 if game_area[mario_y_position - y][mario_x_position + x] in [
                     SpriteMap.GOOMBA.value,
                     SpriteMap.KOOPA.value,
@@ -223,10 +227,14 @@ class MarioExpert:
 
         for x in range(distance_check):
             for y in range(height_check):
-                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT or (
-                    mario_y_position - y
-                ) < 0:
+                if (
+                    (mario_y_position + y) >= GameAreaAttributes.HEIGHT
+                    or (mario_y_position - y) < 0
+                    or (mario_x_position + x) >= GameAreaAttributes.WIDTH
+                    or (mario_x_position - x) < 0
+                ):
                     continue
+
                 if game_area[mario_y_position - y][mario_x_position + x] in [
                     SpriteMap.FIGHTER_FLY.value,
                 ]:
@@ -240,10 +248,14 @@ class MarioExpert:
 
         for x in range(distance_check):
             for y in range(height_check):
-                if (mario_y_position + y) >= GameAreaAttributes.HEIGHT or (
-                    mario_y_position - y
-                ) < 0:
+                if (
+                    (mario_y_position + y) >= GameAreaAttributes.HEIGHT
+                    or (mario_y_position - y) < 0
+                    or (mario_x_position + x) >= GameAreaAttributes.WIDTH
+                    or (mario_x_position - x) < 0
+                ):
                     continue
+
                 if game_area[mario_y_position - y][mario_x_position + x] in [
                     SpriteMap.USED_POWERUP_BLOCK.value,
                     SpriteMap.PIPE.value,
@@ -253,23 +265,51 @@ class MarioExpert:
 
         return False
 
+    def is_used_powerup_block_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int = 0
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+        for x in range(distance_check):
+            if (mario_x_position + x) >= GameAreaAttributes.WIDTH or (
+                mario_x_position - x
+            ) < 0:
+                continue
+
+            if game_area[mario_y_position - height_check][mario_x_position + x] in [
+                SpriteMap.USED_POWERUP_BLOCK.value
+            ]:
+                return True
+        return False
+
     def is_pipe_ahead(
         self, game_area: np.ndarray, distance_check: int, height_check: int = 0
     ) -> bool:
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
         for x in range(distance_check):
+            if (mario_x_position + x) >= GameAreaAttributes.WIDTH or (
+                mario_x_position - x
+            ) < 0:
+                continue
+
             if game_area[mario_y_position - height_check][mario_x_position + x] in [
                 SpriteMap.PIPE.value
             ]:
                 return True
         return False
 
-    def is_pit_ahead(self, game_area: np.ndarray, distance_check: int) -> bool:
+    def is_pit_ahead(
+        self, game_area: np.ndarray, distance_check: int, start_distance: int = 0
+    ) -> bool:
         mario_x_position, mario_y_position = self.get_mario_position(game_area)
         for x in range(distance_check):
-            if game_area[GameAreaAttributes.HEIGHT - 1][mario_x_position + x] in [
-                SpriteMap.AIR.value
-            ]:
+            if (mario_x_position + x + start_distance) >= GameAreaAttributes.WIDTH or (
+                mario_x_position - x
+            ) < 0:
+                continue
+
+            if game_area[GameAreaAttributes.HEIGHT - 1][
+                mario_x_position + x + start_distance
+            ] in [SpriteMap.AIR.value]:
                 return True
         return False
 
@@ -314,6 +354,14 @@ class MarioExpert:
 
         if self.is_pit_ahead(game_area, 3):
             print("Pit ahead")
+            print(game_area)
+            if self.is_used_powerup_block_ahead(game_area, 8):
+                print("Pit and power block ahead")
+                return MarioActions.LONG_JUMP.value
+
+            if self.is_pit_ahead(game_area, 4, 2):
+                print("Large pit ahead")
+                return MarioActions.MEDIUM_JUMP.value
             return MarioActions.TAP_JUMP.value
 
         if self.is_obstacle_ahead(game_area, 4, 2):

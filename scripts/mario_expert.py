@@ -8,11 +8,82 @@ Original Mario Manual: https://www.thegameisafootarcade.com/wp-content/uploads/2
 
 import json
 import logging
-import random
+import time
+from enum import IntEnum
+from enum import Enum
+from collections import deque
 
 import cv2
-from mario_environment import MarioEnvironment
+import numpy as np
 from pyboy.utils import WindowEvent
+
+from mario_environment import MarioEnvironment
+
+
+class SpriteMap(IntEnum):
+    AIR = 0
+    MARIO = 1
+    # ITEMS
+    COIN = 5
+    MUSHROOM = 6
+    STAR = 8
+    # BLOCKS
+    GROUND = 10
+    COIN_BRICK = 10
+    USED_POWERUP_BLOCK = 10
+    MOVING_PLATFORM = 11
+    BRICK = 12
+    POWERUP_BLOCK = 13
+    PIPE = 14
+    # ENEMIES
+    GOOMBA = 15
+    KOOPA = 16
+    FIGHTER_FLY = 18
+    KOOPA_BOMB_SHELL = 25
+
+
+class Action(IntEnum):
+    DOWN = 0
+    LEFT = 1
+    RIGHT = 2
+    UP = 3
+    A = 4  # jump
+    JUMP = 4
+    B = 5  # fireball
+    SPRINT = 5
+
+
+class MemoryMap(IntEnum):
+    MARIO_Y_POSITION = int("C201", 16)
+    MARIO_X_POSITION = int("C202", 16)
+
+
+class GameAreaAttributes(IntEnum):
+    # Width and height of game area
+    WIDTH = 20
+    HEIGHT = 16
+
+
+class MarioActions(Enum):
+    """
+    An enum class to represent custom actions for the Mario game.
+
+    Each value is a tuple where the first element determines how long the action
+    should be performed and the second element is a list of buttons to press.
+    """
+
+    SPRINT_AND_RUN = (
+        1,
+        [
+            Action.RIGHT,
+            Action.SPRINT,
+        ],
+    )
+    TAP_JUMP = (1, [Action.JUMP])
+    SHORT_JUMP = (5, [Action.JUMP])
+    SHORT_MEDIUM_JUMP = (8, [Action.JUMP])
+    MEDIUM_JUMP = (10, [Action.JUMP])
+    LONG_JUMP = (15, [Action.JUMP])
 
 
 class MarioController(MarioEnvironment):
@@ -29,8 +100,8 @@ class MarioController(MarioEnvironment):
 
     def __init__(
         self,
-        act_freq: int = 10,
-        emulation_speed: int = 0,
+        act_freq: int = 1,
+        emulation_speed: int = 3,
         headless: bool = False,
     ) -> None:
         super().__init__(
@@ -42,7 +113,7 @@ class MarioController(MarioEnvironment):
         self.act_freq = act_freq
 
         # Example of valid actions based purely on the buttons you can press
-        valid_actions: list[WindowEvent] = [
+        valid_actions: list[int] = [
             WindowEvent.PRESS_ARROW_DOWN,
             WindowEvent.PRESS_ARROW_LEFT,
             WindowEvent.PRESS_ARROW_RIGHT,
@@ -51,7 +122,7 @@ class MarioController(MarioEnvironment):
             WindowEvent.PRESS_BUTTON_B,
         ]
 
-        release_button: list[WindowEvent] = [
+        release_button: list[int] = [
             WindowEvent.RELEASE_ARROW_DOWN,
             WindowEvent.RELEASE_ARROW_LEFT,
             WindowEvent.RELEASE_ARROW_RIGHT,
@@ -63,7 +134,7 @@ class MarioController(MarioEnvironment):
         self.valid_actions = valid_actions
         self.release_button = release_button
 
-    def run_action(self, action: int) -> None:
+    def run_action(self, action: tuple[int, list]) -> None:
         """
         This is a very basic example of how this function could be implemented
 
@@ -72,13 +143,21 @@ class MarioController(MarioEnvironment):
         You can change the action type to whatever you want or need just remember the base control of the game is pushing buttons
         """
 
-        # Simply toggles the buttons being on or off for a duration of act_freq
-        self.pyboy.send_input(self.valid_actions[action])
+        self.pyboy.send_input(self.valid_actions[Action.RIGHT])
 
-        for _ in range(self.act_freq):
-            self.pyboy.tick()
+        self.pyboy.send_input(self.valid_actions[Action.SPRINT])
 
-        self.pyboy.send_input(self.release_button[action])
+        self.pyboy.tick()
+
+        for duration in range(action[0]):
+            for a in action[1]:
+                self.pyboy.send_input(self.valid_actions[a])
+
+            for _ in range(self.act_freq):
+                self.pyboy.tick()
+
+            for a in action[1]:
+                self.pyboy.send_input(self.release_button[a])
 
 
 class MarioExpert:
@@ -101,14 +180,216 @@ class MarioExpert:
 
         self.video = None
 
-    def choose_action(self):
-        state = self.environment.game_state()
-        frame = self.environment.grab_frame()
-        game_area = self.environment.game_area()
+        # storing the path for mario to move
+        self.path = []
+        self.mario_obstacle_history = deque(maxlen=25)
+        self.mario_position_history = deque(maxlen=3)
 
-        # Implement your code here to choose the best action
-        # time.sleep(0.1)
-        return random.randint(0, len(self.environment.valid_actions) - 1)
+    def get_mario_position(self, game_area: np.ndarray) -> tuple[int, int]:
+        """
+        Get the position of Mario in the game area
+        Returns:
+            tuple: The position of Mario in the game area
+        """
+        # scan the game area
+        for y in range(GameAreaAttributes.HEIGHT):
+            for x in range(GameAreaAttributes.WIDTH):
+                if game_area[y][x] == SpriteMap.MARIO:
+                    return (x + 1, y + 1)
+
+        return (x, y)
+
+    def is_enemy_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int
+    ) -> bool:
+
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+
+        for x in range(distance_check):
+            for y in range(height_check):
+                if (
+                    (mario_y_position + y) >= GameAreaAttributes.HEIGHT
+                    or (mario_y_position - y) < 0
+                    or (mario_x_position + x) >= GameAreaAttributes.WIDTH
+                    or (mario_x_position - x) < 0
+                ):
+                    continue
+
+                if game_area[mario_y_position - y][mario_x_position + x] in [
+                    SpriteMap.GOOMBA.value,
+                    SpriteMap.KOOPA.value,
+                ]:
+                    return True
+        return False
+
+    def is_fighter_fly_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+
+        for x in range(distance_check):
+            for y in range(height_check):
+                if (
+                    (mario_y_position + y) >= GameAreaAttributes.HEIGHT
+                    or (mario_y_position - y) < 0
+                    or (mario_x_position + x) >= GameAreaAttributes.WIDTH
+                    or (mario_x_position - x) < 0
+                ):
+                    continue
+
+                if game_area[mario_y_position - y][mario_x_position + x] in [
+                    SpriteMap.FIGHTER_FLY.value,
+                ]:
+                    return True
+        return False
+
+    def is_obstacle_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+
+        for x in range(distance_check):
+            for y in range(height_check):
+                if (
+                    (mario_y_position + y) >= GameAreaAttributes.HEIGHT
+                    or (mario_y_position - y) < 0
+                    or (mario_x_position + x) >= GameAreaAttributes.WIDTH
+                    or (mario_x_position - x) < 0
+                ):
+                    continue
+
+                if game_area[mario_y_position - y][mario_x_position + x] in [
+                    SpriteMap.USED_POWERUP_BLOCK.value,
+                    SpriteMap.PIPE.value,
+                    SpriteMap.MOVING_PLATFORM.value,
+                ]:
+                    return True
+
+        return False
+
+    def is_used_powerup_block_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int = 0
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+        for x in range(distance_check):
+            if (mario_x_position + x) >= GameAreaAttributes.WIDTH or (
+                mario_x_position - x
+            ) < 0:
+                continue
+
+            if game_area[mario_y_position - height_check][mario_x_position + x] in [
+                SpriteMap.USED_POWERUP_BLOCK.value
+            ]:
+                return True
+        return False
+
+    def is_pipe_ahead(
+        self, game_area: np.ndarray, distance_check: int, height_check: int = 0
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+        for x in range(distance_check):
+            if (mario_x_position + x) >= GameAreaAttributes.WIDTH or (
+                mario_x_position - x
+            ) < 0:
+                continue
+
+            if game_area[mario_y_position - height_check][mario_x_position + x] in [
+                SpriteMap.PIPE.value
+            ]:
+                return True
+        return False
+
+    def is_pit_ahead(
+        self, game_area: np.ndarray, distance_check: int, start_distance: int = 0
+    ) -> bool:
+        mario_x_position, mario_y_position = self.get_mario_position(game_area)
+        for x in range(distance_check):
+            if (mario_x_position + x + start_distance) >= GameAreaAttributes.WIDTH or (
+                mario_x_position - x
+            ) < 0:
+                continue
+
+            if game_area[GameAreaAttributes.HEIGHT - 1][
+                mario_x_position + x + start_distance
+            ] in [SpriteMap.AIR.value]:
+                return True
+        return False
+
+    def is_mario_stuck(self, position_history: deque) -> bool:
+        if len(position_history) < 2:
+            return False
+
+        mario_position = position_history[0]
+        for i in range(len(position_history)):
+            if not np.array_equal(mario_position, position_history[i]):
+                return False
+        return True
+
+    def is_mario_falling(self) -> bool:
+        if len(self.mario_position_history) < 2:
+            return False
+
+        mario_position = self.mario_position_history[0]
+        for i in range(len(self.mario_position_history)):
+            if mario_position[1] < self.mario_position_history[i][1]:
+                return True
+
+        return False
+
+    def choose_action(self) -> tuple[int, list]:
+        game_area = self.environment.game_area()
+        #
+        # get the last column of the game area
+        last_column = game_area[:, -1]
+        self.mario_obstacle_history.append(last_column)
+        self.mario_position_history.append(self.get_mario_position(game_area))
+
+        if self.is_mario_falling():
+            return MarioActions.SPRINT_AND_RUN.value
+
+        if self.is_mario_stuck(self.mario_obstacle_history):
+            print("Mario is stuck")
+            return MarioActions.LONG_JUMP.value
+
+        if self.is_pipe_ahead(game_area, 2):
+            print("Pipe ahead")
+            return MarioActions.SHORT_JUMP.value
+
+        if self.is_fighter_fly_ahead(game_area, 2, 3):
+            print("Fighter Fly ahead")
+            return MarioActions.SPRINT_AND_RUN.value
+
+        if self.is_enemy_ahead(game_area, 3, 2):
+            print("Enemy ahead")
+            return MarioActions.TAP_JUMP.value
+
+        if self.is_enemy_ahead(game_area, 6, 6) and self.is_obstacle_ahead(
+            game_area, 5, 6
+        ):
+            print("Enemy and obstacle ahead")
+            return MarioActions.LONG_JUMP.value
+
+        if self.is_pit_ahead(game_area, 3):
+            if self.is_used_powerup_block_ahead(game_area, 8):
+                print("Pit and power block ahead")
+                return MarioActions.LONG_JUMP.value
+
+            if self.is_pit_ahead(game_area, 6, 4):
+                print("Big pit ahead")
+                return MarioActions.SHORT_MEDIUM_JUMP.value
+
+            if self.is_pit_ahead(game_area, 4, 2):
+                print("Medium pit ahead")
+                return MarioActions.MEDIUM_JUMP.value
+
+            print("Pit ahead")
+            return MarioActions.TAP_JUMP.value
+
+        if self.is_obstacle_ahead(game_area, 4, 2):
+            print("Obstacle ahead")
+            return MarioActions.MEDIUM_JUMP.value
+
+        return MarioActions.SPRINT_AND_RUN.value
 
     def step(self):
         """

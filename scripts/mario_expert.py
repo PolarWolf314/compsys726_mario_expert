@@ -80,8 +80,8 @@ class MarioActions(Enum):
         ],
     )
     TAP_JUMP = (1, [Action.JUMP])
-    SHORT_JUMP = (5, [Action.JUMP])
-    SHORT_MEDIUM_JUMP = (8, [Action.JUMP])
+    TINY_JUMP = (5, [Action.JUMP])
+    SHORT_JUMP = (8, [Action.JUMP])
     MEDIUM_JUMP = (10, [Action.JUMP])
     LONG_JUMP = (15, [Action.JUMP])
 
@@ -101,7 +101,7 @@ class MarioController(MarioEnvironment):
     def __init__(
         self,
         act_freq: int = 1,
-        emulation_speed: int = 3,
+        emulation_speed: int = 1,
         headless: bool = False,
     ) -> None:
         super().__init__(
@@ -353,7 +353,7 @@ class MarioExpert:
 
         if self.is_pipe_ahead(game_area, 2):
             print("Pipe ahead")
-            return MarioActions.SHORT_JUMP.value
+            return MarioActions.TINY_JUMP.value
 
         if self.is_fighter_fly_ahead(game_area, 2, 3):
             print("Fighter Fly ahead")
@@ -376,7 +376,7 @@ class MarioExpert:
 
             if self.is_pit_ahead(game_area, 6, 4):
                 print("Big pit ahead")
-                return MarioActions.SHORT_MEDIUM_JUMP.value
+                return MarioActions.SHORT_JUMP.value
 
             if self.is_pit_ahead(game_area, 4, 2):
                 print("Medium pit ahead")
